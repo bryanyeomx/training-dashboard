@@ -4,7 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Training Dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+window._chartReady = loadScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js')
+  .catch(()=>loadScript('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js'))
+  .catch(()=>loadScript('https://unpkg.com/chart.js@4.4.0/dist/chart.umd.min.js'));
+</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
   :root {
@@ -139,14 +144,26 @@
   <div id="status" class="loading">Connecting to intervals.icu...</div>
 
   <!-- Fitness -->
-  <div class="section-title">Fitness & Wellness</div>
+  <div class="section-title">Fitness & Form</div>
   <div class="cards-6">
     <div class="card"><div class="card-label">Fitness (CTL)</div><div class="card-value c-blue" id="ctl">—</div><div class="card-sub">42d avg load</div></div>
     <div class="card"><div class="card-label">Fatigue (ATL)</div><div class="card-value c-red" id="atl">—</div><div class="card-sub">7d avg load</div></div>
     <div class="card"><div class="card-label">Form (TSB)</div><div class="card-value" id="form">—</div><div class="card-sub" id="form-label">stress balance</div></div>
-    <div class="card"><div class="card-label">Resting HR</div><div class="card-value c-green" id="rhr">—</div><div class="card-sub" id="rhr-sub">bpm</div></div>
-    <div class="card"><div class="card-label">Weight</div><div class="card-value c-yellow" id="weight">—</div><div class="card-sub">kg</div></div>
-    <div class="card"><div class="card-label">HRV</div><div class="card-value c-purple" id="hrv">—</div><div class="card-sub" id="hrv-sub">ms SDNN</div></div>
+    <div class="card"><div class="card-label">VO2Max</div><div class="card-value c-purple" id="vo2max">—</div><div class="card-sub" id="vo2max-sub">ml/kg/min</div></div>
+    <div class="card"><div class="card-label">Ramp Rate</div><div class="card-value c-yellow" id="ramp">—</div><div class="card-sub">CTL/week</div></div>
+    <div class="card"><div class="card-label">Weight</div><div class="card-value c-green" id="weight">—</div><div class="card-sub">kg</div></div>
+  </div>
+
+  <!-- Wellness -->
+  <div class="section-title">Daily Wellness</div>
+  <div class="cards-6">
+    <div class="card"><div class="card-label">VO2 Max</div><div class="card-value c-purple" id="vo2max">—</div><div class="card-sub" id="vo2max-sub">ml/kg/min</div></div>
+    <div class="card"><div class="card-label">Resting HR</div><div class="card-value c-red" id="rhr">—</div><div class="card-sub">bpm</div></div>
+    <div class="card"><div class="card-label">HRV</div><div class="card-value c-blue" id="hrv">—</div><div class="card-sub">ms (Garmin)</div></div>
+    <div class="card"><div class="card-label">Sleep</div><div class="card-value c-purple" id="sleep">—</div><div class="card-sub" id="sleep-sub">hours</div></div>
+    <div class="card"><div class="card-label">Sleep Score</div><div class="card-value" id="sleep-score">—</div><div class="card-sub">/100</div></div>
+    <div class="card"><div class="card-label">Steps</div><div class="card-value c-green" id="steps">—</div><div class="card-sub">yesterday</div></div>
+    <div class="card"><div class="card-label">Ramp Rate</div><div class="card-value c-yellow" id="ramp">—</div><div class="card-sub">CTL/week</div></div>
   </div>
 
   <!-- Weekly stats -->
@@ -211,6 +228,13 @@
     <div class="chart-box"><h3>Weekly Distance (km)</h3><canvas id="chartDist"></canvas></div>
     <div class="chart-box"><h3>Pace Trend (min/km) at HR</h3><canvas id="chartPace"></canvas></div>
     <div class="chart-box"><h3>Cadence Trend (spm)</h3><canvas id="chartCad"></canvas></div>
+  </div>
+
+  <!-- Charts row 3 -->
+  <div class="charts-3">
+    <div class="chart-box"><h3>VO2Max Trend</h3><canvas id="chartVo2"></canvas></div>
+    <div class="chart-box"><h3>HRV Trend (ms)</h3><canvas id="chartHrv"></canvas></div>
+    <div class="chart-box"><h3>Sleep Score & Duration</h3><canvas id="chartSleep"></canvas></div>
   </div>
 
   <!-- HR Zone distribution -->
@@ -289,14 +313,29 @@ function setFilter(f){
 }
 
 function renderWellness(w){
-  if(!w){['ctl','atl','form','rhr','weight','hrv'].forEach(id=>document.getElementById(id).textContent='N/A');return;}
+  if(!w){['ctl','atl','form','rhr','weight','hrv','vo2max','ramp','sleep','sleep-score','steps'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='N/A';});return;}
   document.getElementById('ctl').textContent=w.ctl!=null?Math.round(w.ctl):'—';
   document.getElementById('atl').textContent=w.atl!=null?Math.round(w.atl):'—';
-  const rhr=w.restingHR||w.resting_hr||w.icu_resting_hr;
-  document.getElementById('rhr').textContent=rhr||'—';
   document.getElementById('weight').textContent=w.weight?w.weight.toFixed(1):'—';
-  const hrv=w.hrv||w.hrvSDNN||w.rmssd;
+  const rhr=w.restingHR||w.resting_hr;
+  document.getElementById('rhr').textContent=rhr||'—';
+  const hrv=w.hrv||w.hrvSDNN;
   document.getElementById('hrv').textContent=hrv?Math.round(hrv):'—';
+  const vo2=w.vo2max;
+  const vo2El=document.getElementById('vo2max');
+  if(vo2El){vo2El.textContent=vo2||'—';
+    if(vo2){const cat=vo2>=60?'Excellent':vo2>=55?'Very Good':vo2>=49?'Good':vo2>=43?'Average':'Below avg';
+      const sub=document.getElementById('vo2max-sub');if(sub)sub.textContent=cat+' for age';
+      vo2El.className='card-value '+(vo2>=55?'c-green':vo2>=49?'c-yellow':'c-red');}}
+  const rampEl=document.getElementById('ramp');
+  if(rampEl){const ramp=w.rampRate;rampEl.textContent=ramp?ramp.toFixed(1):'—';
+    if(ramp){rampEl.className='card-value '+(Math.abs(ramp)>8?'c-red':Math.abs(ramp)>5?'c-yellow':'c-green');}}
+  const sleepH=w.sleepSecs?+(w.sleepSecs/3600).toFixed(1):null;
+  const sleepEl=document.getElementById('sleep');if(sleepEl)sleepEl.textContent=sleepH||'—';
+  const sleepSub=document.getElementById('sleep-sub');if(sleepSub)sleepSub.textContent=sleepH?(sleepH>=7?'✓ Good sleep':'⚠ Low sleep'):'hours';
+  const ss=w.sleepScore;const ssEl=document.getElementById('sleep-score');
+  if(ssEl){ssEl.textContent=ss||'—';if(ss)ssEl.className='card-value '+(ss>=80?'c-green':ss>=60?'c-yellow':'c-red');}
+  const stEl=document.getElementById('steps');if(stEl)stEl.textContent=w.steps?w.steps.toLocaleString():'—';
   if(w.ctl!=null&&w.atl!=null){
     const tsb=Math.round(w.ctl-w.atl);
     const el=document.getElementById('form');
@@ -479,6 +518,47 @@ function renderCharts(acts){
   });
 }
 
+function renderWellnessCharts(w30){
+  if(!w30||!w30.length)return;
+  const wl=w30.filter(d=>d.id);
+  const labels=wl.map(d=>d.id.slice(5));
+
+  // VO2Max
+  const vo2data=wl.map(d=>d.vo2max||null);
+  if(charts.vo2)charts.vo2.destroy();
+  charts.vo2=new Chart(document.getElementById('chartVo2'),{
+    type:'line',
+    data:{labels,datasets:[{label:'VO2Max',data:vo2data,borderColor:'#b47ef7',tension:.3,pointRadius:4,borderWidth:2,fill:true,backgroundColor:'rgba(180,126,247,0.1)',spanGaps:true}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6b7494',maxTicksLimit:8,font:{size:9}},grid:{color:'#1c2030'}},y:{min:40,ticks:{color:'#6b7494',font:{size:9}},grid:{color:'#1c2030'}}}}
+  });
+
+  // HRV
+  const hrvData=wl.map(d=>d.hrv||null);
+  if(charts.hrv)charts.hrv.destroy();
+  charts.hrv=new Chart(document.getElementById('chartHrv'),{
+    type:'line',
+    data:{labels,datasets:[{label:'HRV',data:hrvData,borderColor:'#4f8ef7',tension:.3,pointRadius:3,borderWidth:2,fill:true,backgroundColor:'rgba(79,142,247,0.1)',spanGaps:true}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6b7494',maxTicksLimit:8,font:{size:9}},grid:{color:'#1c2030'}},y:{ticks:{color:'#6b7494',font:{size:9}},grid:{color:'#1c2030'}}}}
+  });
+
+  // Sleep score + duration
+  const sleepScore=wl.map(d=>d.sleepScore||null);
+  const sleepHrs=wl.map(d=>d.sleepSecs?+(d.sleepSecs/3600).toFixed(1):null);
+  if(charts.sleep)charts.sleep.destroy();
+  charts.sleep=new Chart(document.getElementById('chartSleep'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Sleep Score',data:sleepScore,backgroundColor:'rgba(79,202,142,0.5)',borderRadius:3,yAxisID:'y'},
+      {label:'Hours',data:sleepHrs,type:'line',borderColor:'#f7c24f',tension:.3,pointRadius:2,borderWidth:2,yAxisID:'y1',spanGaps:true},
+    ]},
+    options:{responsive:true,plugins:{legend:{labels:{color:'#6b7494',font:{size:10}}}},scales:{
+      x:{ticks:{color:'#6b7494',maxTicksLimit:8,font:{size:9}},grid:{color:'#1c2030'}},
+      y:{min:0,max:100,ticks:{color:'#6b7494',font:{size:9}},grid:{color:'#1c2030'}},
+      y1:{type:'linear',position:'right',min:4,max:10,ticks:{color:'#6b7494',font:{size:9}},grid:{drawOnChartArea:false}},
+    }}
+  });
+}
+
 function renderActivities(acts){
   const container=document.getElementById('activities-container');
   if(!acts||acts.length===0){container.innerHTML='<div class="empty-state">No activities found.</div>';return;}
@@ -545,12 +625,13 @@ async function loadAll(){
     const past7=new Date(Date.now()-7*86400000).toISOString().slice(0,10);
     const[activities,wellness]=await Promise.all([
       apiFetch(`/activities?oldest=${past30}&newest=${today}`),
-      apiFetch(`/wellness?oldest=${past7}&newest=${today}`),
+      apiFetch(`/wellness?oldest=${past30}&newest=${today}`),
     ]);
     allActivities=activities||[];
     filteredActivities=activeFilter==='All'?allActivities:allActivities.filter(a=>a.type===activeFilter);
     const latestW=wellness&&wellness.length>0?[...wellness].reverse().find(d=>d.ctl!=null||d.atl!=null||d.restingHR!=null)||wellness[wellness.length-1]:null;
     renderWellness(latestW);
+    renderWellnessCharts(wellness);
     renderWeekStats(allActivities);
     renderRunMetrics(allActivities);
     renderWeekCalendar(allActivities);
@@ -559,6 +640,8 @@ async function loadAll(){
     renderZones(filteredActivities);
     renderActivities(filteredActivities);
     cachedData={wellness:latestW,wellness30:wellness,activities:allActivities};
+    // Pass wellness30 to wellness charts separately
+    window._wellness30=wellness;
     setStatus(`Updated ${new Date().toLocaleTimeString()} — ${allActivities.length} activities`,'ok');
   }catch(err){
     setStatus('Error: '+err.message,'error');console.error(err);
@@ -586,6 +669,10 @@ async function sendChat(){
     const w=cachedData.wellness;const acts=cachedData.activities||[];
     ctx=`\nATHLETE TRAINING DATA (intervals.icu, Singapore-based runner):\n`;
     if(w)ctx+=`CTL:${w.ctl!=null?Math.round(w.ctl):'?'} ATL:${w.atl!=null?Math.round(w.atl):'?'} TSB:${w.ctl!=null&&w.atl!=null?Math.round(w.ctl-w.atl):'?'} RHR:${w.restingHR||w.resting_hr||'?'}bpm Weight:${w.weight||'?'}kg\n`;
+    if(w){
+      ctx+=`VO2Max:${w.vo2max||'?'} RHR:${w.restingHR||'?'}bpm HRV:${w.hrv||'?'}ms RampRate:${w.rampRate?w.rampRate.toFixed(1):'?'}/wk\n`;
+      ctx+=`Sleep:${w.sleepSecs?(w.sleepSecs/3600).toFixed(1):'?'}h SleepScore:${w.sleepScore||'?'} Steps:${w.steps||'?'}\n`;
+    }
     ctx+=`Activities (last 30d, ${acts.length} total, filter:${activeFilter}):\n`;
     acts.slice(0,20).forEach(a=>{
       const d=a.start_date_local?a.start_date_local.slice(0,10):'?';
@@ -616,7 +703,7 @@ async function sendChat(){
   finally{sendBtn.disabled=false;input.focus();}
 }
 
-loadAll();
+window._chartReady.then(()=>loadAll()).catch(()=>{setStatus('Failed to load Chart.js — check internet connection','error');});
 </script>
 </body>
 </html>
